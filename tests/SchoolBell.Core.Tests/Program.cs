@@ -449,6 +449,69 @@ Test("Журнал дня зберігається і перечитується
     Eq(0, again.Entries.Count, "новий день — порожній журнал");
 });
 
+// ---------- Профіль «лише тривога», стандартні звуки, тривога під час запуску ----------
+
+Test("Перший запуск: дзвінків і хвилини мовчання немає, неактивності немає", () =>
+{
+    var s = AppSettings.CreateInitial();
+    Eq(0, Schedule.EventsOn(s, mon).Count, "подій у понеділок");
+    Eq(0, Schedule.EventsOn(s, sat).Count, "подій у суботу");
+    Eq(0, s.InactivityPeriods.Count, "періодів неактивності");
+    Eq(null, Schedule.FindInactivePeriod(s, At(sat, 10, 0))?.Name, "субота не глушить тривогу");
+});
+
+Test("Без settings.json завантажується профіль «лише тривога»", () =>
+{
+    var dir = Path.Combine(tmpDir, "fresh-" + Guid.NewGuid().ToString("N"));
+    var old = Environment.GetEnvironmentVariable("SCHOOLBELL_DATA");
+    Environment.SetEnvironmentVariable("SCHOOLBELL_DATA", dir);
+    try
+    {
+        var s = SettingsStore.Load().Settings;
+        Eq(0, s.BellDays.Count, "дні дзвінків");
+        True(!s.SilenceEnabled, "хвилина мовчання вимкнена");
+    }
+    finally { Environment.SetEnvironmentVariable("SCHOOLBELL_DATA", old); }
+});
+
+Test("Стандартні звуки підставляються, лише коли свого файлу немає", () =>
+{
+    var bundled = Path.Combine(tmpDir, "bundled");
+    Directory.CreateDirectory(bundled);
+    File.WriteAllText(Path.Combine(bundled, DefaultSounds.AirAlertFile), "a");
+    File.WriteAllText(Path.Combine(bundled, DefaultSounds.AllClearFile), "c");
+
+    var s = AppSettings.CreateInitial();
+    True(DefaultSounds.EnsureDefaults(s, bundled), "перший раз змінено");
+    True(File.Exists(s.AirAlertSound!.StoredPath), "копія тривоги в папці програми");
+    True(File.Exists(s.AllClearSound!.StoredPath), "копія відбою в папці програми");
+    True(!DefaultSounds.EnsureDefaults(s, bundled), "повторно нічого не змінюється");
+
+    File.Delete(s.AirAlertSound.StoredPath);
+    True(DefaultSounds.EnsureDefaults(s, bundled), "зниклий файл замінено стандартним");
+    True(File.Exists(s.AirAlertSound!.StoredPath), "новий файл є");
+
+    var own = Path.Combine(tmpDir, "own.mp3");
+    File.WriteAllText(own, "x");
+    s.AllClearSound = SettingsStore.ImportSound(own, SoundKind.AllClear);
+    var before = s.AllClearSound.StoredPath;
+    DefaultSounds.EnsureDefaults(s, bundled);
+    Eq(before, s.AllClearSound!.StoredPath, "свій файл не перезаписується");
+
+    var empty = AppSettings.CreateInitial();
+    True(!DefaultSounds.EnsureDefaults(empty, Path.Combine(tmpDir, "no-such-dir")), "без стандартних файлів нічого не робимо");
+});
+
+Test("Тривога під час запуску: оголошується, якщо сьогодні ще не оголошували", () =>
+{
+    JournalEntry E(JournalKind k, int h) => new() { At = At(mon, h, 0), Kind = k, Title = "t" };
+    True(OngoingAlertPolicy.ShouldAnnounce(Array.Empty<JournalEntry>()), "порожній журнал (ранок, нічна тривога)");
+    True(!OngoingAlertPolicy.ShouldAnnounce(new[] { E(JournalKind.AlertStarted, 9) }), "перезапуск посеред оголошеної тривоги");
+    True(OngoingAlertPolicy.ShouldAnnounce(new[] { E(JournalKind.AlertStarted, 9), E(JournalKind.AlertEnded, 10) }), "нова тривога після відбою");
+    True(!OngoingAlertPolicy.ShouldAnnounce(new[] { E(JournalKind.AlertEnded, 8), E(JournalKind.AlertStarted, 11), E(JournalKind.AlertLevelChanged, 12) }), "зміна рівня не скидає");
+    True(OngoingAlertPolicy.ShouldAnnounce(new[] { E(JournalKind.AlertOngoing, 9) }), "старий запис «триває» без звуку");
+});
+
 // ---------- Запуск ----------
 
 int failed = 0;

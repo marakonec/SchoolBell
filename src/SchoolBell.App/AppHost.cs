@@ -44,6 +44,17 @@ internal sealed class AppHost : IDisposable
         _settings = load.Settings;
         Warning = load.Warning;
 
+        // Стандартні звуки тривоги й відбою з папки програми, якщо свої не обрано.
+        try
+        {
+            if (DefaultSounds.EnsureDefaults(_settings, DefaultSounds.BundledDir))
+                SettingsStore.Save(_settings);
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Write("Не вдалося зберегти стандартні звуки в налаштуваннях", ex);
+        }
+
         Http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         Http.DefaultRequestHeaders.UserAgent.ParseAdd("SchoolBell/1.0");
 
@@ -143,6 +154,18 @@ internal sealed class AppHost : IDisposable
                     Title = "Рівень тривоги змінився" + levelSuffix, Detail = info?.Reason
                 });
                 break;
+            case AlertTransition.AlreadyActive when whyNoSound is null && OngoingAlertPolicy.ShouldAnnounce(Journal.Entries):
+            {
+                // ПК увімкнули (або програму запустили) посеред тривоги, яку сьогодні ще не оголошували.
+                var e = Journal.Add(new JournalEntry
+                {
+                    At = now, Kind = JournalKind.AlertStarted, Sound = SoundKind.AirAlert, Level = info?.Level,
+                    Title = "Повітряна тривога" + levelSuffix,
+                    Detail = Join(info?.Reason, "тривала на момент запуску програми")
+                });
+                Player.RequestAuto(SoundKind.AirAlert, "Повітряна тривога", e.Id);
+                break;
+            }
             case AlertTransition.AlreadyActive:
                 // Не дублюємо запис, якщо тривога вже є в журналі (напр. після перезапуску програми).
                 if (Journal.LastAlertEntry()?.Kind is null or JournalKind.AlertEnded)

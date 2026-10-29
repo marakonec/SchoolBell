@@ -137,6 +137,21 @@ public sealed class AppSettings
         }
     };
 
+    /// <summary>
+    /// Налаштування першого запуску (коли settings.json ще немає).
+    /// Профіль «лише тривога»: у закладі вже є своя система дзвінків, тому дзвінки на пари
+    /// і хвилина мовчання вимкнені, а періодів неактивності немає. Тривога лунає в будь-який день,
+    /// коли ПК увімкнений. Розклад і хвилину мовчання можна увімкнути в інтерфейсі.
+    /// </summary>
+    public static AppSettings CreateInitial()
+    {
+        var s = CreateDefault();
+        s.BellDays.Clear();
+        s.SilenceEnabled = false;
+        s.InactivityPeriods.Clear();
+        return s;
+    }
+
     /// <summary>Файл, який реально треба відтворити для звуку (з урахуванням «одного дзвінка»).</summary>
     public SoundFile? ResolveSound(SoundKind kind) => kind switch
     {

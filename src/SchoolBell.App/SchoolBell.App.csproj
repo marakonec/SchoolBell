@@ -14,7 +14,7 @@
     <StartupObject>SchoolBell.App.Program</StartupObject>
     <ApplicationIcon>Assets\bell.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.2.1</Version>
+    <Version>1.3.0</Version>
     <Product>Шкільний дзвінок</Product>
     <Company>SchoolBell</Company>
     <!-- Дозволяє збирати проєкт і на не-Windows машинах (CI). -->
@@ -23,6 +23,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SchoolBell.Core\SchoolBell.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Стандартні звуки тривоги й відбою: копіюються в папку sounds поруч із SchoolBell.exe. -->
+  <ItemGroup>
+    <None Include="Assets\sounds\**\*.mp3"
+          Link="sounds\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>

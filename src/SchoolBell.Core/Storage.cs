@@ -102,7 +102,7 @@ public static class SettingsStore
         var backup = main + ".bak";
 
         if (!File.Exists(main) && !File.Exists(backup))
-            return new LoadResult { Settings = AppSettings.CreateDefault() };
+            return new LoadResult { Settings = AppSettings.CreateInitial() };
 
         if (TryRead(main, out var s, out var error))
             return new LoadResult { Settings = s! };
@@ -118,7 +118,7 @@ public static class SettingsStore
         ErrorLog.Write($"Не вдалося прочитати {backup}: {error2}");
         return new LoadResult
         {
-            Settings = AppSettings.CreateDefault(),
+            Settings = AppSettings.CreateInitial(),
             Warning = "Файл налаштувань пошкоджений, завантажено стандартні налаштування. Перевірте розклад і звуки."
         };
     }
